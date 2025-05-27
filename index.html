@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Monitoring IoT Gas & Lingkungan</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-gauge@1.0.1/dist/chartjs-plugin-gauge.min.js"></script>
+
+  <style>
+    body {
+      background-color: #0d1117;
+      color: #58a6ff;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+      text-shadow: 0 0 10px #58a6ff;
+    }
+
+    .gauge-container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 30px;
+      margin-bottom: 100px;
+    }
+
+    canvas {
+      background: #161b22;
+      border-radius: 20px;
+      padding: 10px;
+      margin-bottom: 30px;
+      animation: fadeIn 1s ease-in;
+    }
+
+    .sensor {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .sensor-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #58a6ff;
+      margin-top: 8px;
+      text-shadow: 0 0 10px #58a6ff;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .status-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+      width: 250px;
+      box-shadow: 0 0 10px #0ff;
+      animation: fadeIn 1s ease-in;
+    }
+
+    .status {
+      font-size: 20px;
+      font-weight: bold;
+      padding: 6px 10px;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
+    .on {
+      background-color: #00ffcc;
+      color: #000;
+    }
+
+    .off {
+      background-color: #333;
+      color: #aaa;
+    }
+
+    .telegram-button {
+      display: inline-block;
+      margin-top: 20px;
+      background-color: #0088cc;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 30px;
+      text-decoration: none;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+
+    .telegram-button:hover {
+      background-color: #007ab8;
+    }
+
+    .alarm-icon {
+      font-size: 40px;
+      margin-top: 20px;
+      color: red;
+      display: none;
+      animation: blink 1s infinite;
+    }
+
+    .upload-section {
+      margin-top: 20px;
+      color: white;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
+
+    footer {
+      margin-top: 40px;
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Monitoring IoT Gas & Lingkungan</h1>
+
+  <div class="gauge-container">
+    <div class="sensor">
+      <canvas id="gasGauge" width="200" height="200"></canvas>
+      <div>Gas (ppm)</div>
+      <div class="sensor-value" id="valueGas">0 ppm</div>
+    </div>
+    <div class="sensor">
+      <canvas id="tempGauge" width="200" height="200"></canvas>
+      <div>Suhu (°C)</div>
+      <div class="sensor-value" id="valueSuhu">0 °C</div>
+    </div>
+    <div class="sensor">
+      <canvas id="humGauge" width="200" height="200"></canvas>
+      <div>Kelembapan (%)</div>
+      <div class="sensor-value" id="valueHum">0 %</div>
+    </div>
+  </div>
+
+  <div class="status-row">
+    <div class="status-card">
+      <div>💡 Status LED:</div>
+      <div id="ledStatus" class="status">-</div>
+    </div>
+
+    <div class="status-card">
+      <div>🔊 Status Buzzer:</div>
+      <div id="buzzerStatus" class="status">-</div>
+    </div>
+  </div>
+
+  <div id="alarmIcon" class="alarm-icon">🚨 ALARM: SUHU TINGGI!</div>
+
+  <audio id="alarmSound" loop>
+    <source id="audioSource" src="https://www.soundjay.com/button/sounds/beep-07.mp3" type="audio/mpeg">
+    Browser tidak mendukung suara.
+  </audio>
+
+  <div class="upload-section">
+    Pilih file alarm (.mp3):
+    <input type="file" accept="audio/mp3" onchange="uploadAudio(event)">
+  </div>
+
+  <a href="https://t.me/deteksikbcrngas_bot" target="_blank" class="telegram-button">📩 Konfigurasi Bot Telegram</a>
+
+  <footer>
+    © 2025 Monitoring IoT Gas & Lingkungan - Made with ❤️
+  </footer>
+
+  <script>
+    function uploadAudio(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const audioURL = URL.createObjectURL(file);
+        const source = document.getElementById('audioSource');
+        source.src = audioURL;
+        document.getElementById('alarmSound').load();
+      }
+    }
+
+    const AUTH_TOKEN = 'Xf10PSwE6mFh1TyOxDpParPmagfYgjFS';
+    const BASE_URL = 'https://blynk.cloud/external/api';
+
+    const gaugeOptions = (max, color) => ({
+      type: 'doughnut',
+      data: {
+        labels: ['Value', 'Remaining'],
+        datasets: [{
+          data: [0, max],
+          backgroundColor: [color, '#222'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: false,
+        cutout: '80%',
+        rotation: -90,
+        circumference: 180,
+        plugins: {
+          tooltip: { enabled: false },
+          legend: { display: false },
+          gauge: {
+            needle: {
+              radiusPercentage: 2,
+              widthPercentage: 3.2,
+              lengthPercentage: 80,
+              color: 'white'
+            },
+            valueLabel: {
+              display: true,
+              formatter: (value) => Math.round(value),
+              color: '#58a6ff',
+              font: {
+                size: 20
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const gasGauge = new Chart(
+      document.getElementById('gasGauge').getContext('2d'),
+      gaugeOptions(2500, "#ff4c4c")
+    );
+    const tempGauge = new Chart(
+      document.getElementById('tempGauge').getContext('2d'),
+      gaugeOptions(100, "#ffc107")
+    );
+    const humGauge = new Chart(
+      document.getElementById('humGauge').getContext('2d'),
+      gaugeOptions(100, "#00ccff")
+    );
+
+    async function updateData() {
+      try {
+        const [gas, suhu, hum] = await Promise.all([
+          fetch(`${BASE_URL}/get?token=${AUTH_TOKEN}&v1`).then(res => res.text()),
+          fetch(`${BASE_URL}/get?token=${AUTH_TOKEN}&v2`).then(res => res.text()),
+          fetch(`${BASE_URL}/get?token=${AUTH_TOKEN}&v3`).then(res => res.text()),
+        ]);
+
+        gasGauge.data.datasets[0].data = [Number(gas), 2500 - Number(gas)];
+        gasGauge.update();
+        tempGauge.data.datasets[0].data = [Number(suhu), 100 - Number(suhu)];
+        tempGauge.update();
+        humGauge.data.datasets[0].data = [Number(hum), 100 - Number(hum)];
+        humGauge.update();
+
+        document.getElementById('valueGas').textContent = `${gas} ppm`;
+        document.getElementById('valueSuhu').textContent = `${suhu} °C`;
+        document.getElementById('valueHum').textContent = `${hum} %`;
+
+        const isGasHigh = Number(gas) >= 1000;
+        const isTempHigh = Number(suhu) > 26;
+
+        document.getElementById('ledStatus').textContent = isGasHigh ? "MENYALA" : "MATI";
+        document.getElementById('ledStatus').className = `status ${isGasHigh ? "on" : "off"}`;
+
+        document.getElementById('buzzerStatus').textContent = isGasHigh ? "AKTIF" : "NONAKTIF";
+        document.getElementById('buzzerStatus').className = `status ${isGasHigh ? "on" : "off"}`;
+
+        const alarm = document.getElementById('alarmSound');
+        const alarmIcon = document.getElementById('alarmIcon');
+
+        if (isTempHigh || isGasHigh) {
+          alarm.play().catch(err => console.error("Audio play error:", err));
+          alarmIcon.style.display = "block";
+        } else {
+          alarm.pause();
+          alarm.currentTime = 0;
+          alarmIcon.style.display = "none";
+        }
+
+      } catch (err) {
+        console.error("Gagal mengambil data:", err);
+      }
+    }
+
+    setInterval(updateData, 5000);
+    updateData();
+  </script>
+</body>
+</html>
