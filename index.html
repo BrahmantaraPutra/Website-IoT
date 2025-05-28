@@ -268,8 +268,8 @@
         document.getElementById('valueSuhu').textContent = `${suhu} °C`;
         document.getElementById('valueHum').textContent = `${hum} %`;
 
-        const isGasHigh = Number(gas) >= 1000;
-        const isTempHigh = Number(suhu) > 26;
+        const isGasHigh = Number(gas) >= 2500;
+        const isTempHigh = Number(suhu) > 50;
 
         document.getElementById('ledStatus').textContent = isGasHigh ? "MENYALA" : "MATI";
         document.getElementById('ledStatus').className = `status ${isGasHigh ? "on" : "off"}`;
